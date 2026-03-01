@@ -1,0 +1,42 @@
+{
+  "name": "shenlun-teacher",
+  "version": "1.0.0",
+  "description": "申论老师 - OpenClaw 智能申论教学工具",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src/**/*.js",
+    "lint:fix": "eslint src/**/*.js --fix",
+    "docs": "jsdoc -c jsdoc.json"
+  },
+  "keywords": [
+    "shenlun",
+    "申论",
+    "openclaw",
+    "education",
+    "ai-tutor"
+  ],
+  "author": "哈吉米",
+  "license": "MIT",
+  "dependencies": {
+    "node-fetch": "^3.3.2",
+    "dotenv": "^16.4.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "eslint": "^8.56.0",
+    "jsdoc": "^4.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/shenlun-teacher.git"
+  }
+}

@@ -9,6 +9,7 @@ import path from 'path';
 import { logger } from '../utils/logger.js';
 import { httpClient } from '../utils/http-client.js';
 import { cache } from '../utils/cache.js';
+import { Scraper } from '../utils/scraper.js';
 
 class ResourceModule {
   constructor(config) {
@@ -16,6 +17,12 @@ class ResourceModule {
     this.questions = [];
     this.answers = [];
     this.initialized = false;
+
+    // 初始化爬虫
+    this.scraper = new Scraper({
+      baseUrl: 'https://www.aipta.com',
+      timeout: 30000,
+    });
   }
 
   /**
@@ -267,6 +274,171 @@ class ResourceModule {
   getAnswerKeyPoints(questionId) {
     const answer = this.getAnswer(questionId);
     return answer ? answer.keyPoints : [];
+  }
+
+  /**
+   * 从网络下载真题
+   *
+   * @param {string} url - 目标URL
+   * @param {number} limit - 下载限制
+   * @returns {Promise<Object>} 下载结果
+   */
+  async downloadFromWeb(url, limit = 50) {
+    try {
+      logger.info(`Starting download from ${url}`);
+
+      // 使用爬虫下载真题
+      const rawQuestions = await this.scraper.downloadQuestions(url, limit);
+
+      // 转换为标准格式
+      const newQuestions = rawQuestions.map(q => this.scraper.normalizeQuestion(q));
+      const newAnswers = rawQuestions.map(q => this.scraper.normalizeAnswer(q));
+
+      // 合并到现有数据
+      const existingIds = new Set(this.questions.map(q => q.id));
+      const uniqueQuestions = newQuestions.filter(q => !existingIds.has(q.id));
+
+      this.questions = [...this.questions, ...uniqueQuestions];
+
+      const existingAnswerIds = new Set(this.answers.map(a => a.questionId));
+      const uniqueAnswers = newAnswers.filter(a => !existingAnswerIds.has(a.questionId));
+
+      this.answers = [...this.answers, ...uniqueAnswers];
+
+      // 保存到文件
+      await this.saveQuestions();
+      await this.saveAnswers();
+
+      logger.info(`Downloaded ${uniqueQuestions.length} questions and ${uniqueAnswers.length} answers`);
+
+      return {
+        success: true,
+        questionsAdded: uniqueQuestions.length,
+        answersAdded: uniqueAnswers.length,
+        totalQuestions: this.questions.length,
+        totalAnswers: this.answers.length,
+      };
+    } catch (error) {
+      logger.error(`Failed to download from web: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 从爱真题网站下载湖南申论真题
+   *
+   * @param {number} limit - 下载限制
+   * @returns {Promise<Object>} 下载结果
+   */
+  async downloadFromAipta(limit = 50) {
+    return this.downloadFromWeb(
+      'https://www.aipta.com/zt/sk/hn/sl/',
+      limit
+    );
+  }
+
+  /**
+   * 更新资源库
+   *
+   * @param {Object} options - 更新选项
+   * @param {string} options.source - 数据源
+   * @param {number} options.limit - 下载限制
+   * @returns {Promise<Object>} 更新结果
+   */
+  async updateResources(options = {}) {
+    const source = options.source || 'aipta';
+    const limit = options.limit || 50;
+
+    try {
+      logger.info(`Updating resources from ${source}`);
+
+      if (source === 'aipta') {
+        return await this.downloadFromAipta(limit);
+      } else if (source.startsWith('http')) {
+        return await this.downloadFromWeb(source, limit);
+      } else {
+        throw new Error(`Unknown source: ${source}`);
+      }
+    } catch (error) {
+      logger.error(`Failed to update resources: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 保存真题到文件
+   */
+  async saveQuestions() {
+    try {
+      const dataPath = path.join(process.cwd(), this.config.questions.localPath);
+      await fs.mkdir(path.dirname(dataPath), { recursive: true });
+      await fs.writeFile(dataPath, JSON.stringify(this.questions, null, 2), 'utf-8');
+      logger.info(`Saved ${this.questions.length} questions to ${dataPath}`);
+    } catch (error) {
+      logger.error(`Failed to save questions: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 保存答案到文件
+   */
+  async saveAnswers() {
+    try {
+      const dataPath = path.join(process.cwd(), this.config.answers.localPath);
+      await fs.mkdir(path.dirname(dataPath), { recursive: true });
+      await fs.writeFile(dataPath, JSON.stringify(this.answers, null, 2), 'utf-8');
+      logger.info(`Saved ${this.answers.length} answers to ${dataPath}`);
+    } catch (error) {
+      logger.error(`Failed to save answers: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 添加真题
+   *
+   * @param {Object} question - 真题数据
+   * @returns {Promise<Object>} 添加结果
+   */
+  async addQuestion(question) {
+    try {
+      // 生成ID
+      const id = question.id || `q_${Date.now()}`;
+      const newQuestion = { ...question, id };
+
+      this.questions.push(newQuestion);
+      await this.saveQuestions();
+
+      logger.info(`Added question ${id}`);
+      return { success: true, id };
+    } catch (error) {
+      logger.error(`Failed to add question: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 添加答案
+   *
+   * @param {Object} answer - 答案数据
+   * @returns {Promise<Object>} 添加结果
+   */
+  async addAnswer(answer) {
+    try {
+      // 生成ID
+      const id = answer.id || `a_${Date.now()}`;
+      const newAnswer = { ...answer, id };
+
+      this.answers.push(newAnswer);
+      await this.saveAnswers();
+
+      logger.info(`Added answer ${id}`);
+      return { success: true, id };
+    } catch (error) {
+      logger.error(`Failed to add answer: ${error.message}`);
+      throw error;
+    }
   }
 
   /**

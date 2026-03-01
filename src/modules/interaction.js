@@ -58,6 +58,9 @@ class InteractionModule {
       case 'reset':
         result = this.handleReset(context);
         break;
+      case 'update_resources':
+        result = await this.handleUpdateResources(cleanMessage, context);
+        break;
       default:
         result = await this.handleDefault(cleanMessage, context);
     }
@@ -122,6 +125,11 @@ class InteractionModule {
       return 'reset';
     }
 
+    // 更新资源
+    if (/更新|update|下载|download/.test(lowerMessage)) {
+      return 'update_resources';
+    }
+
     return 'default';
   }
 
@@ -151,6 +159,8 @@ class InteractionModule {
                  `- 说"拓展思路"获取多种答题角度\n\n` +
                  `📖 **参考答案**\n` +
                  `- 查看参考答案要点进行对比学习\n\n` +
+                 `🌐 **更新资源**\n` +
+                 `- 说"更新真题"或"下载真题"获取更多题目\n\n` +
                  `你想从哪里开始？`;
 
     return {
@@ -421,6 +431,52 @@ class InteractionModule {
       actions: [],
       attachments: [],
     };
+  }
+
+  /**
+   * 处理更新资源请求
+   *
+   * @param {string} message - 用户消息
+   * @param {Object} context - 上下文
+   * @returns {Promise<Object>} 处理结果
+   */
+  async handleUpdateResources(message, context) {
+    const { resourceModule } = context;
+
+    // 解析下载数量
+    const limitMatch = message.match(/(\d+)道|(\d+)个/);
+    const limit = limitMatch ? parseInt(limitMatch[1]) : 20;
+
+    try {
+      // 发送开始消息
+      const startReply = `🔄 正在从爱真题网站下载真题...\n` +
+                        `预计下载：${limit}道题\n` +
+                        `这可能需要几分钟，请稍候...`;
+
+      // 异步下载
+      resourceModule.updateResources({ source: 'aipta', limit })
+        .then(result => {
+          logger.info(`Resource update completed: ${JSON.stringify(result)}`);
+        })
+        .catch(error => {
+          logger.error(`Resource update failed: ${error.message}`);
+        });
+
+      return {
+        reply: startReply,
+        actions: [],
+        attachments: [],
+      };
+    } catch (error) {
+      logger.error(`Failed to update resources: ${error.message}`);
+
+      return {
+        reply: `下载失败：${error.message}\n\n` +
+               `请稍后再试，或联系管理员检查网络连接。`,
+        actions: [],
+        attachments: [],
+      };
+    }
   }
 
   /**

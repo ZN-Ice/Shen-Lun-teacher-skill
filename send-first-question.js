@@ -2,15 +2,23 @@ import { ResourceModule } from './src/modules/resource.js';
 import config from './src/config/default.js';
 
 /**
- * 发送一道真题，包含题目和对应的材料
+ * 发送一道第一题，包含题目和对应的材料
  */
-async function sendRandomQuestion() {
+async function sendFirstQuestion() {
   const resourceModule = new ResourceModule({ resources: config.resources });
   await resourceModule.initialize();
 
-  // 随机选择一道题
-  const questions = resourceModule.getQuestions();
-  const question = questions[Math.floor(Math.random() * questions.length)];
+  // 筛选出所有第一题
+  const allQuestions = resourceModule.getQuestions();
+  const firstQuestions = allQuestions.filter(q => q.title.includes('第一题'));
+
+  if (firstQuestions.length === 0) {
+    console.log('❌ 没有找到第一题\n');
+    return;
+  }
+
+  // 随机选择一道第一题
+  const question = firstQuestions[Math.floor(Math.random() * firstQuestions.length)];
 
   console.log('📋 题目推送\n');
   console.log('═'.repeat(70));
@@ -60,4 +68,4 @@ async function sendRandomQuestion() {
   console.log();
 }
 
-sendRandomQuestion().catch(console.error);
+sendFirstQuestion().catch(console.error);

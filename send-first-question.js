@@ -2,18 +2,27 @@ import { ResourceModule } from './src/modules/resource.js';
 import config from './src/config/default.js';
 
 /**
- * 发送一道第一题，包含题目和对应的材料
+ * 发送一道第一题（仅限真实真题，不含示例题目）
  */
 async function sendFirstQuestion() {
   const resourceModule = new ResourceModule({ resources: config.resources });
   await resourceModule.initialize();
 
-  // 筛选出所有第一题
+  // 筛选出所有第一题，且必须是真实真题（有URL，来源不是"官方参考答案"等示例来源）
   const allQuestions = resourceModule.getQuestions();
-  const firstQuestions = allQuestions.filter(q => q.title.includes('第一题'));
+  const firstQuestions = allQuestions.filter(q => {
+    const isFirstQuestion = q.title.includes('第一题');
+    const hasUrl = q.url && q.url !== 'undefined' && q.url !== '';
+    const isNotExample = q.source !== '官方参考答案' &&
+                        q.source !== '示例' &&
+                        q.source !== 'example';
+
+    return isFirstQuestion && hasUrl && isNotExample;
+  });
 
   if (firstQuestions.length === 0) {
-    console.log('❌ 没有找到第一题\n');
+    console.log('❌ 没有找到真实的第一题（可能需要从网站爬取真题）\n');
+    console.log('💡 提示：运行 `node scrape-materials.js` 从爱真题网站爬取真题\n');
     return;
   }
 
